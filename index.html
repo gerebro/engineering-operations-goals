@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Goals Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+/* ============================================================
+   EDIT YOUR GOALS HERE — everything below <script id="goal-data">
+   is the only part you need to touch to update this dashboard.
+   ============================================================ */
+
+:root{
+  --paper: #e9ede9;
+  --panel: #ffffff;
+  --ink: #1f2a24;
+  --ink-soft: #55645b;
+  --hairline: #d3dad2;
+
+  --on-track: #3f8f6b;
+  --on-track-bg: #e6f2ec;
+  --at-risk: #d98f3c;
+  --at-risk-bg: #faf0e0;
+  --blocked: #c24b4b;
+  --blocked-bg: #f8e8e6;
+  --done: #5b6b8c;
+  --done-bg: #eaedf3;
+}
+
+*{ box-sizing: border-box; }
+
+html, body{
+  margin:0;
+  padding:0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Work Sans', -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap{
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 48px 32px 80px;
+}
+
+/* ---------- Header ---------- */
+
+header{
+  margin-bottom: 44px;
+}
+
+.eyebrow-row{
+  display:flex;
+  align-items:baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+h1{
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 2.4rem;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.updated{
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.subtitle{
+  font-size: 1.02rem;
+  color: var(--ink-soft);
+  max-width: 640px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+
+.summary-row{
+  display:flex;
+  gap: 28px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+.summary-stat{
+  min-width: 120px;
+}
+
+.summary-stat .num{
+  font-family: 'Fraunces', serif;
+  font-size: 2rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.summary-stat .label{
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+.summary-stat.on-track .num{ color: var(--on-track); }
+.summary-stat.at-risk .num{ color: var(--at-risk); }
+.summary-stat.blocked .num{ color: var(--blocked); }
+.summary-stat.done .num{ color: var(--done); }
+
+/* ---------- Quarterly rail ---------- */
+
+.rail-section{
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 28px 28px 20px;
+  margin-bottom: 44px;
+}
+
+.rail-title{
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: 0 0 24px;
+}
+
+.rail-track{
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  column-gap: 0;
+  padding-top: 6px;
+}
+
+.rail-line{
+  position: absolute;
+  top: 22px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--hairline);
+}
+
+.rail-quarter{
+  position: relative;
+  padding-top: 40px;
+  text-align: center;
+  border-left: 1px solid var(--hairline);
+}
+
+.rail-quarter:first-child{ border-left: none; }
+
+.quarter-label{
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.rail-stop{
+  display:inline-flex;
+  align-items:center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1.5px solid var(--hairline);
+  border-radius: 20px;
+  padding: 5px 12px 5px 8px;
+  font-size: 0.76rem;
+  margin: 0 6px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+  max-width: calc(100% - 12px);
+}
+
+.rail-stop:hover{ transform: translateY(-1px); }
+
+.rail-stop .dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.rail-stop span.name{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-stop.status-on-track{ border-color: var(--on-track); }
+.rail-stop.status-on-track .dot{ background: var(--on-track); }
+.rail-stop.status-at-risk{ border-color: var(--at-risk); }
+.rail-stop.status-at-risk .dot{ background: var(--at-risk); }
+.rail-stop.status-blocked{ border-color: var(--blocked); }
+.rail-stop.status-blocked .dot{ background: var(--blocked); }
+.rail-stop.status-done{ border-color: var(--done); }
+.rail-stop.status-done .dot{ background: var(--done); }
+
+.rail-stops-wrap{
+  min-height: 40px;
+}
+
+/* ---------- Goal cards ---------- */
+
+.goals-heading{
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+}
+
+.goal-card{
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-left: 4px solid var(--hairline);
+  border-radius: 4px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.goal-card.status-on-track{ border-left-color: var(--on-track); }
+.goal-card.status-at-risk{ border-left-color: var(--at-risk); }
+.goal-card.status-blocked{ border-left-color: var(--blocked); }
+.goal-card.status-done{ border-left-color: var(--done); }
+
+.goal-head{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  cursor: pointer;
+}
+
+.goal-head-left{
+  display:flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.goal-name{
+  font-family: 'Fraunces', serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.goal-meta{
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  display:flex;
+  gap: 10px;
+  align-items:center;
+}
+
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge .dot{ width:6px; height:6px; border-radius:50%; }
+
+.badge.status-on-track{ background: var(--on-track-bg); color: var(--on-track); }
+.badge.status-on-track .dot{ background: var(--on-track); }
+.badge.status-at-risk{ background: var(--at-risk-bg); color: var(--at-risk); }
+.badge.status-at-risk .dot{ background: var(--at-risk); }
+.badge.status-blocked{ background: var(--blocked-bg); color: var(--blocked); }
+.badge.status-blocked .dot{ background: var(--blocked); }
+.badge.status-done{ background: var(--done-bg); color: var(--done); }
+.badge.status-done .dot{ background: var(--done); }
+
+.goal-head-right{
+  display:flex;
+  align-items:center;
+  gap: 18px;
+  flex-shrink: 0;
+}
+
+.progress-mini{
+  width: 120px;
+}
+
+.progress-track{
+  height: 6px;
+  background: var(--hairline);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill{
+  height: 100%;
+  border-radius: 4px;
+}
+
+.progress-pct{
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  text-align: right;
+}
+
+.chevron{
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--ink-soft);
+  border-bottom: 2px solid var(--ink-soft);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.goal-card.open .chevron{ transform: rotate(-135deg); }
+
+.goal-body{
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+  border-top: 1px solid transparent;
+}
+
+.goal-card.open .goal-body{
+  border-top: 1px solid var(--hairline);
+}
+
+.steps-list{
+  padding: 6px 22px 18px;
+}
+
+.step{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.9rem;
+}
+
+.step:last-child{ border-bottom: none; }
+
+.step-check{
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--hairline);
+  flex-shrink: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.step.status-done .step-check{
+  background: var(--done);
+  border-color: var(--done);
+}
+
+.step.status-done .step-check::after{
+  content: '';
+  width: 4px;
+  height: 7px;
+  border-right: 1.5px solid white;
+  border-bottom: 1.5px solid white;
+  transform: rotate(45deg) translate(-1px,-1px);
+}
+
+.step-name{ flex: 1; min-width: 0; }
+.step.status-done .step-name{ color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--hairline); }
+
+.step-quarter{
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}
+
+footer{
+  margin-top: 40px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  text-align:center;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ transition: none !important; }
+}
+
+@media (max-width: 640px){
+  .wrap{ padding: 32px 18px 60px; }
+  h1{ font-size: 1.9rem; }
+  .rail-track{ grid-template-columns: repeat(2, 1fr); row-gap: 20px; }
+  .rail-quarter:nth-child(3){ border-left: none; }
+  .goal-head{ flex-wrap: wrap; }
+  .goal-head-right{ width: 100%; justify-content: space-between; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow-row">
+      <h1 id="page-title">Goals roadmap</h1>
+      <div class="updated" id="updated-line"></div>
+    </div>
+    <p class="subtitle" id="page-subtitle"></p>
+    <div class="summary-row" id="summary-row"></div>
+  </header>
+
+  <section class="rail-section">
+    <p class="rail-title" id="rail-title">Quarterly view</p>
+    <div class="rail-track" id="rail-track">
+      <div class="rail-line"></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="goals-heading">Goals</p>
+    <div id="goals-list"></div>
+  </section>
+
+  <footer>Edit the data object in this file to update — no build step required.</footer>
+</div>
+
+<script id="goal-data">
+/* ============================================================
+   YOUR DATA — edit everything in this object.
+   status must be one of: "on-track", "at-risk", "blocked", "done"
+   quarter must match one of the labels in QUARTERS below.
+   ============================================================ */
+
+const QUARTERS = ["Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"];
+
+const DASHBOARD = {
+  title: "Goals roadmap",
+  subtitle: "A running view of my 2026–27 goals, shared for our 1:1s.",
+  updated: "Updated Sep 16, 2026",
+  goals: [
+    {
+      name: "Backlog Triage Ownership",
+      status: "on-track",
+      quarter: "Q3 2026",
+      steps: [
+        { name: "Clean out completed items and put new structure in place", status: "done", quarter: "Q3 2026" },
+        { name: "Working according to the new structure and keeping the structure and cont. Making sure its followed and no Wis are falling between the chairs.", status: "in progress", quarter: "Q4 2026" },
+        { name: "Additional improvements in place in the structure to ease day-to-day work for the Engineerings teams.", status: "not started", quarter: "Q1 2027" }
+      ]
+    },
+    {
+      name: "Measure Before/After Impact of Every Delivery",
+      status: "not started",
+      quarter: "Q1 2027",
+      steps: [
+        { name: "Methodology + template ready", status: "not started", quarter: "Q4 2026" },
+        { name: "5+ register entries", status: "not started", quarter: "Q1 2027" },
+        { name: "15+ entries; leadership presentation", status: "not started", quarter: "Q1 2027" }
+      ]
+    },
+    {
+      name: "Engineering KPI Dashboard for Leadership",
+      status: "on-track",
+      quarter: "Q1 2027",
+      steps: [
+        { name: "KPI specification approved", status: "in progress", quarter: "Q4 2026" },
+        { name: "Prototype live with all metrics", status: "not started", quarter: "Q1 2027" },
+        { name: "2 leadership reviews completed", status: "not started", quarter: "Q1 2027" }
+      ]
+    },
+    {
+      name: "Standardize Deployment Tracking",
+      status: "not started",
+      quarter: "Q2 2027",
+      steps: [
+        { name: "Pipeline inventory + schema agreed", status: "not started", quarter: "Q4 2026" },
+        { name: "~30% coverage; 1 correlation demo", status: "not started", quarter: "Q1 2027" },
+        { name: "80%+ coverage; <15min incident correlation", status: "not started", quarter: "Q2 2027" }
+      ]
+    },
+    {
+      name: "Revamp Release Notes for Customer Adoption",
+      status: "not started",
+      quarter: "Q1 2027",
+      steps: [
+        { name: "Audit report with recommendations", status: "not started", quarter: "Q4 2026" },
+        { name: "New format launched; 1 release published", status: "not started", quarter: "Q1 2027" },
+        { name: "Read rate baselined; CS confirms no surprises", status: "not started", quarter: "Q2 2027" }
+      ]
+    },
+    {
+      name: "Risk Classification for Production Changes",
+      status: "not started",
+      quarter: "Q4 2026",
+      steps: [
+        { name: "Matrix with 3+ examples per tier", status: "not started", quarter: "Q4 2026" },
+        { name: "3+ changes processed through matrix", status: "not started", quarter: "Q4 2026" },
+        { name: "60-day streak; 0 unannounced high-risk changes", status: "not started", quarter: "Q4 2026" }
+      ]
+    }
+  ]
+};
+</script>
+
+<script>
+(function(){
+  const STATUS_LABEL = {
+    "on-track": "On track",
+    "at-risk": "At risk",
+    "blocked": "Blocked",
+    "done": "Done"
+  };
+
+  document.getElementById('page-title').textContent = DASHBOARD.title;
+  document.getElementById('page-subtitle').textContent = DASHBOARD.subtitle;
+  document.getElementById('updated-line').textContent = DASHBOARD.updated;
+
+  function pctForGoal(goal){
+    if(!goal.steps || goal.steps.length === 0) return goal.status === 'done' ? 100 : 0;
+    const done = goal.steps.filter(s => s.status === 'done').length;
+    return Math.round((done / goal.steps.length) * 100);
+  }
+
+  // ---- Summary counts ----
+  const counts = { 'on-track':0, 'at-risk':0, 'blocked':0, 'done':0 };
+  DASHBOARD.goals.forEach(g => counts[g.status]++);
+
+  const summaryRow = document.getElementById('summary-row');
+  const summaryDefs = [
+    ['on-track', 'On track'],
+    ['at-risk', 'At risk'],
+    ['blocked', 'Blocked'],
+    ['done', 'Done']
+  ];
+  summaryDefs.forEach(([key, label]) => {
+    const el = document.createElement('div');
+    el.className = `summary-stat ${key}`;
+    el.innerHTML = `<div class="num">${counts[key]}</div><div class="label">${label}</div>`;
+    summaryRow.appendChild(el);
+  });
+
+  // ---- Quarterly rail ----
+  const railTrack = document.getElementById('rail-track');
+  QUARTERS.forEach(q => {
+    const col = document.createElement('div');
+    col.className = 'rail-quarter';
+
+    const label = document.createElement('div');
+    label.className = 'quarter-label';
+    label.textContent = q;
+    col.appendChild(label);
+
+    const stopsWrap = document.createElement('div');
+    stopsWrap.className = 'rail-stops-wrap';
+
+    DASHBOARD.goals.filter(g => g.quarter === q).forEach(g => {
+      const stop = document.createElement('div');
+      stop.className = `rail-stop status-${g.status}`;
+      stop.innerHTML = `<span class="dot"></span><span class="name">${g.name}</span>`;
+      stop.addEventListener('click', () => {
+        const card = document.getElementById('goal-' + slug(g.name));
+        if(card){
+          card.classList.add('open');
+          card.querySelector('.goal-body').style.maxHeight = card.querySelector('.steps-list').scrollHeight + 'px';
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+      stopsWrap.appendChild(stop);
+    });
+
+    col.appendChild(stopsWrap);
+    railTrack.appendChild(col);
+  });
+
+  function slug(str){
+    return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  }
+
+  // ---- Goal cards ----
+  const goalsList = document.getElementById('goals-list');
+
+  DASHBOARD.goals.forEach(goal => {
+    const pct = pctForGoal(goal);
+    const card = document.createElement('div');
+    card.className = `goal-card status-${goal.status}`;
+    card.id = 'goal-' + slug(goal.name);
+
+    card.innerHTML = `
+      <div class="goal-head">
+        <div class="goal-head-left">
+          <div class="goal-name">${goal.name}</div>
+          <div class="goal-meta">
+            <span class="badge status-${goal.status}"><span class="dot"></span>${STATUS_LABEL[goal.status]}</span>
+            <span>Target ${goal.quarter}</span>
+          </div>
+        </div>
+        <div class="goal-head-right">
+          <div class="progress-mini">
+            <div class="progress-track"><div class="progress-fill" style="width:${pct}%; background: var(--${goal.status});"></div></div>
+            <div class="progress-pct">${pct}%</div>
+          </div>
+          <div class="chevron"></div>
+        </div>
+      </div>
+      <div class="goal-body">
+        <div class="steps-list">
+          ${goal.steps.map(s => `
+            <div class="step status-${s.status}">
+              <div class="step-check"></div>
+              <div class="step-name">${s.name}</div>
+              <div class="step-quarter">${s.quarter}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    const head = card.querySelector('.goal-head');
+    head.addEventListener('click', () => {
+      const body = card.querySelector('.goal-body');
+      const isOpen = card.classList.toggle('open');
+      body.style.maxHeight = isOpen ? card.querySelector('.steps-list').scrollHeight + 'px' : '0px';
+    });
+
+    goalsList.appendChild(card);
+  });
+})();
+</script>
+
+</body>
+</html>
