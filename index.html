@@ -377,6 +377,22 @@ h1{
   transform: rotate(45deg) translate(-1px,-1px);
 }
 
+.step-status-select{
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.step-status-select.status-done{ color: var(--done); border-color: var(--done); }
+.step-status-select.status-in-progress{ color: var(--on-track); border-color: var(--on-track); }
+.step-status-select.status-blocked{ color: var(--blocked); border-color: var(--blocked); }
+.step-status-select.status-not-started{ color: var(--ink-soft); }
+
 .step-name{ flex: 1; min-width: 0; }
 .step.status-done .step-name{ color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--hairline); }
 
@@ -521,13 +537,24 @@ const DASHBOARD = {
     "done": "Done"
   };
 
+  const STEP_STATUS_LABEL = {
+    "not-started": "Not started",
+    "in-progress": "In progress",
+    "blocked": "Blocked",
+    "done": "Done"
+  };
+
+  function normalizedStatus(status){
+    return status === 'in progress' ? 'in-progress' : status === 'not started' ? 'not-started' : status;
+  }
+
   document.getElementById('page-title').textContent = DASHBOARD.title;
   document.getElementById('page-subtitle').textContent = DASHBOARD.subtitle;
   document.getElementById('updated-line').textContent = DASHBOARD.updated;
 
   function pctForGoal(goal){
     if(!goal.steps || goal.steps.length === 0) return goal.status === 'done' ? 100 : 0;
-    const done = goal.steps.filter(s => s.status === 'done').length;
+    const done = goal.steps.filter(s => normalizedStatus(s.status) === 'done').length;
     return Math.round((done / goal.steps.length) * 100);
   }
 
@@ -565,7 +592,7 @@ const DASHBOARD = {
 
     DASHBOARD.goals.filter(g => g.quarter === q).forEach(g => {
       const stop = document.createElement('div');
-      stop.className = `rail-stop status-${g.status}`;
+      stop.className = `rail-stop status-${normalizedStatus(g.status)}`;
       stop.innerHTML = `<span class="dot"></span><span class="name">${g.name}</span>`;
       stop.addEventListener('click', () => {
         const card = document.getElementById('goal-' + slug(g.name));
@@ -586,13 +613,32 @@ const DASHBOARD = {
     return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   }
 
+  const STORAGE_KEY = 'engineering-goals-progress';
+  let savedProgress = {};
+  try { savedProgress = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(error) { savedProgress = {}; }
+  DASHBOARD.goals.forEach(goal => {
+    const savedSteps = savedProgress[slug(goal.name)];
+    if(savedSteps) goal.steps.forEach((step, index) => {
+      if(savedSteps[index]) step.status = savedSteps[index];
+    });
+  });
+
+  function saveProgress(){
+    const progress = {};
+    DASHBOARD.goals.forEach(goal => {
+      progress[slug(goal.name)] = goal.steps.map(step => normalizedStatus(step.status));
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  }
+
   // ---- Goal cards ----
   const goalsList = document.getElementById('goals-list');
 
   DASHBOARD.goals.forEach(goal => {
     const pct = pctForGoal(goal);
     const card = document.createElement('div');
-    card.className = `goal-card status-${goal.status}`;
+    const goalStatus = normalizedStatus(goal.status);
+    card.className = `goal-card status-${goalStatus}`;
     card.id = 'goal-' + slug(goal.name);
 
     card.innerHTML = `
@@ -600,24 +646,27 @@ const DASHBOARD = {
         <div class="goal-head-left">
           <div class="goal-name">${goal.name}</div>
           <div class="goal-meta">
-            <span class="badge status-${goal.status}"><span class="dot"></span>${STATUS_LABEL[goal.status]}</span>
+            <span class="badge status-${goalStatus}"><span class="dot"></span>${STATUS_LABEL[goalStatus] || 'Not started'}</span>
             <span>Target ${goal.quarter}</span>
           </div>
         </div>
         <div class="goal-head-right">
           <div class="progress-mini">
-            <div class="progress-track"><div class="progress-fill" style="width:${pct}%; background: var(--${goal.status});"></div></div>
-            <div class="progress-pct">${pct}%</div>
+            <div class="progress-track"><div class="progress-fill" style="width:${pct}%; background: var(--${goalStatus === 'not-started' ? 'hairline' : goalStatus});"></div></div>
+            <div class="progress-pct">${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones</div>
           </div>
           <div class="chevron"></div>
         </div>
       </div>
       <div class="goal-body">
         <div class="steps-list">
-          ${goal.steps.map(s => `
-            <div class="step status-${s.status}">
+          ${goal.steps.map((s, index) => `
+            <div class="step status-${normalizedStatus(s.status)}">
               <div class="step-check"></div>
               <div class="step-name">${s.name}</div>
+              <select class="step-status-select status-${normalizedStatus(s.status)}" data-step-index="${index}" aria-label="Status for ${s.name}">
+                ${['not-started', 'in-progress', 'blocked', 'done'].map(option => `<option value="${option}" ${normalizedStatus(s.status) === option ? 'selected' : ''}>${STEP_STATUS_LABEL[option]}</option>`).join('')}
+              </select>
               <div class="step-quarter">${s.quarter}</div>
             </div>
           `).join('')}
@@ -630,6 +679,23 @@ const DASHBOARD = {
       const body = card.querySelector('.goal-body');
       const isOpen = card.classList.toggle('open');
       body.style.maxHeight = isOpen ? card.querySelector('.steps-list').scrollHeight + 'px' : '0px';
+    });
+
+    card.querySelectorAll('.step-status-select').forEach(select => {
+      select.addEventListener('click', event => event.stopPropagation());
+      select.addEventListener('change', event => {
+        const step = goal.steps[Number(event.target.dataset.stepIndex)];
+        step.status = event.target.value;
+        saveProgress();
+
+        const stepRow = event.target.closest('.step');
+        stepRow.className = `step status-${step.status}`;
+        event.target.className = `step-status-select status-${step.status}`;
+        const pct = pctForGoal(goal);
+        card.querySelector('.progress-fill').style.width = pct + '%';
+        card.querySelector('.progress-pct').textContent = `${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones`;
+        if(card.classList.contains('open')) card.querySelector('.goal-body').style.maxHeight = card.querySelector('.steps-list').scrollHeight + 'px';
+      });
     });
 
     goalsList.appendChild(card);
