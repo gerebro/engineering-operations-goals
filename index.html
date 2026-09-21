@@ -112,6 +112,73 @@ h1{
 .summary-stat.at-risk .num{ color: var(--at-risk); }
 .summary-stat.blocked .num{ color: var(--blocked); }
 .summary-stat.done .num{ color: var(--done); }
+.summary-stat.not-started .num{ color: var(--ink-soft); }
+
+.edit-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  margin: 18px 0 16px;
+}
+
+.edit-toolbar-actions{ display:flex; gap:8px; }
+
+.edit-button{
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--ink);
+  color: white;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.edit-button.secondary{
+  background: transparent;
+  color: var(--ink);
+}
+
+.edit-button:disabled{ opacity: 0.45; cursor: not-allowed; }
+
+.edit-field,
+.edit-select{
+  width:100%;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.86rem;
+  padding: 7px 8px;
+}
+
+.edit-field.goal-name-input{ font-family: 'Fraunces', serif; font-size: 1.1rem; }
+.edit-select{ width:auto; padding: 4px 6px; }
+.edit-milestone{ align-items:flex-start; }
+.edit-milestone .step-name{ padding-top: 4px; }
+.remove-step{
+  border: none;
+  background: transparent;
+  color: var(--blocked);
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 5px 0;
+  cursor: pointer;
+}
+
+.add-step{
+  border: 1px dashed var(--hairline);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 7px 10px;
+  cursor: pointer;
+  margin-top: 10px;
+}
 
 /* ---------- Quarterly rail ---------- */
 
@@ -204,6 +271,8 @@ h1{
 .rail-stop.status-blocked .dot{ background: var(--blocked); }
 .rail-stop.status-done{ border-color: var(--done); }
 .rail-stop.status-done .dot{ background: var(--done); }
+.rail-stop.status-not-started{ border-color: var(--hairline); }
+.rail-stop.status-not-started .dot{ background: var(--hairline); }
 
 .rail-stops-wrap{
   min-height: 40px;
@@ -420,6 +489,9 @@ footer{
   .rail-quarter:nth-child(3){ border-left: none; }
   .goal-head{ flex-wrap: wrap; }
   .goal-head-right{ width: 100%; justify-content: space-between; }
+  .edit-toolbar{ align-items:flex-start; flex-direction:column; }
+  .edit-toolbar-actions{ width:100%; }
+  .edit-button{ flex:1; }
 }
 </style>
 </head>
@@ -443,11 +515,18 @@ footer{
   </section>
 
   <section>
-    <p class="goals-heading">Goals</p>
+    <div class="edit-toolbar">
+      <p class="goals-heading">Goals</p>
+      <div class="edit-toolbar-actions">
+        <button class="edit-button" id="edit-toggle" type="button">Edit goals</button>
+        <button class="edit-button secondary" id="edit-cancel" type="button" hidden>Cancel</button>
+        <button class="edit-button" id="edit-save" type="button" hidden>Save changes</button>
+      </div>
+    </div>
     <div id="goals-list"></div>
   </section>
 
-  <footer>Edit the data object in this file to update — no build step required.</footer>
+  <footer>Updates are saved in this browser. Use Edit goals to maintain the roadmap from the page.</footer>
 </div>
 
 <script id="goal-data">
@@ -548,6 +627,12 @@ const DASHBOARD = {
     return status === 'in progress' ? 'in-progress' : status === 'not started' ? 'not-started' : status;
   }
 
+  const GOALS_STORAGE_KEY = 'engineering-goals-data';
+  try {
+    const savedGoals = JSON.parse(localStorage.getItem(GOALS_STORAGE_KEY) || 'null');
+    if(Array.isArray(savedGoals)) DASHBOARD.goals = savedGoals;
+  } catch(error) {}
+
   document.getElementById('page-title').textContent = DASHBOARD.title;
   document.getElementById('page-subtitle').textContent = DASHBOARD.subtitle;
   document.getElementById('updated-line').textContent = DASHBOARD.updated;
@@ -559,15 +644,16 @@ const DASHBOARD = {
   }
 
   // ---- Summary counts ----
-  const counts = { 'on-track':0, 'at-risk':0, 'blocked':0, 'done':0 };
-  DASHBOARD.goals.forEach(g => counts[g.status]++);
+  const counts = { 'on-track':0, 'at-risk':0, 'blocked':0, 'done':0, 'not-started':0 };
+  DASHBOARD.goals.forEach(g => counts[normalizedStatus(g.status)]++);
 
   const summaryRow = document.getElementById('summary-row');
   const summaryDefs = [
     ['on-track', 'On track'],
     ['at-risk', 'At risk'],
     ['blocked', 'Blocked'],
-    ['done', 'Done']
+    ['done', 'Done'],
+    ['not-started', 'Not started']
   ];
   summaryDefs.forEach(([key, label]) => {
     const el = document.createElement('div');
@@ -631,75 +717,95 @@ const DASHBOARD = {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
   }
 
-  // ---- Goal cards ----
+  // ---- Goal cards and editor ----
   const goalsList = document.getElementById('goals-list');
+  const editToggle = document.getElementById('edit-toggle');
+  const editCancel = document.getElementById('edit-cancel');
+  const editSave = document.getElementById('edit-save');
+  let editing = false;
+  let draftGoals;
 
-  DASHBOARD.goals.forEach(goal => {
-    const pct = pctForGoal(goal);
-    const card = document.createElement('div');
-    const goalStatus = normalizedStatus(goal.status);
-    card.className = `goal-card status-${goalStatus}`;
-    card.id = 'goal-' + slug(goal.name);
+  function cloneGoals(goals){ return JSON.parse(JSON.stringify(goals)); }
 
-    card.innerHTML = `
-      <div class="goal-head">
-        <div class="goal-head-left">
-          <div class="goal-name">${goal.name}</div>
-          <div class="goal-meta">
-            <span class="badge status-${goalStatus}"><span class="dot"></span>${STATUS_LABEL[goalStatus] || 'Not started'}</span>
-            <span>Target ${goal.quarter}</span>
-          </div>
-        </div>
-        <div class="goal-head-right">
-          <div class="progress-mini">
-            <div class="progress-track"><div class="progress-fill" style="width:${pct}%; background: var(--${goalStatus === 'not-started' ? 'hairline' : goalStatus});"></div></div>
-            <div class="progress-pct">${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones</div>
-          </div>
-          <div class="chevron"></div>
-        </div>
-      </div>
-      <div class="goal-body">
-        <div class="steps-list">
-          ${goal.steps.map((s, index) => `
-            <div class="step status-${normalizedStatus(s.status)}">
-              <div class="step-check"></div>
-              <div class="step-name">${s.name}</div>
-              <select class="step-status-select status-${normalizedStatus(s.status)}" data-step-index="${index}" aria-label="Status for ${s.name}">
-                ${['not-started', 'in-progress', 'blocked', 'done'].map(option => `<option value="${option}" ${normalizedStatus(s.status) === option ? 'selected' : ''}>${STEP_STATUS_LABEL[option]}</option>`).join('')}
-              </select>
-              <div class="step-quarter">${s.quarter}</div>
+  function optionMarkup(options, selected){
+    return options.map(option => `<option value="${option}" ${option === selected ? 'selected' : ''}>${option}</option>`).join('');
+  }
+
+  function renderGoals(){
+    goalsList.innerHTML = '';
+    const goals = editing ? draftGoals : DASHBOARD.goals;
+    goals.forEach((goal, goalIndex) => {
+      const pct = pctForGoal(goal);
+      const goalStatus = normalizedStatus(goal.status);
+      const card = document.createElement('div');
+      card.className = `goal-card status-${goalStatus}`;
+      card.id = 'goal-' + slug(goal.name);
+
+      if(editing){
+        card.innerHTML = `
+          <div class="goal-head">
+            <div class="goal-head-left">
+              <input class="edit-field goal-name-input" data-field="name" value="${goal.name.replace(/"/g, '&quot;')}" aria-label="Goal name">
+              <div class="goal-meta">
+                <select class="edit-select" data-field="status" aria-label="Goal status">${optionMarkup(['on-track', 'at-risk', 'blocked', 'done', 'not-started'], goalStatus)}</select>
+                <select class="edit-select" data-field="quarter" aria-label="Target quarter">${optionMarkup(QUARTERS, goal.quarter)}</select>
+              </div>
             </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
+            <div class="goal-head-right"><div class="progress-pct">${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones</div></div>
+          </div>
+          <div class="goal-body open"><div class="steps-list">
+            ${goal.steps.map((step, stepIndex) => `
+              <div class="step edit-milestone">
+                <input class="edit-field step-name" data-step-index="${stepIndex}" data-field="name" value="${step.name.replace(/"/g, '&quot;')}" aria-label="Milestone name">
+                <select class="edit-select" data-step-index="${stepIndex}" data-field="status" aria-label="Milestone status">${optionMarkup(['not-started', 'in-progress', 'blocked', 'done'], normalizedStatus(step.status))}</select>
+                <select class="edit-select" data-step-index="${stepIndex}" data-field="quarter" aria-label="Milestone quarter">${optionMarkup(QUARTERS, step.quarter)}</select>
+                <button class="remove-step" data-step-index="${stepIndex}" type="button">Remove</button>
+              </div>
+            `).join('')}
+            <button class="add-step" data-goal-index="${goalIndex}" type="button">+ Add milestone</button>
+          </div></div>
+        `;
+      } else {
+        card.innerHTML = `
+          <div class="goal-head"><div class="goal-head-left"><div class="goal-name">${goal.name}</div><div class="goal-meta"><span class="badge status-${goalStatus}"><span class="dot"></span>${STATUS_LABEL[goalStatus] || 'Not started'}</span><span>Target ${goal.quarter}</span></div></div>
+            <div class="goal-head-right"><div class="progress-mini"><div class="progress-track"><div class="progress-fill" style="width:${pct}%; background: var(--${goalStatus === 'not-started' ? 'hairline' : goalStatus});"></div></div><div class="progress-pct">${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones</div></div><div class="chevron"></div></div>
+          </div>
+          <div class="goal-body"><div class="steps-list">${goal.steps.map((step, index) => `<div class="step status-${normalizedStatus(step.status)}"><div class="step-check"></div><div class="step-name">${step.name}</div><select class="step-status-select status-${normalizedStatus(step.status)}" data-step-index="${index}" aria-label="Status for ${step.name}">${optionMarkup(['not-started', 'in-progress', 'blocked', 'done'], normalizedStatus(step.status))}</select><div class="step-quarter">${step.quarter}</div></div>`).join('')}</div></div>
+        `;
+      }
 
-    const head = card.querySelector('.goal-head');
-    head.addEventListener('click', () => {
-      const body = card.querySelector('.goal-body');
-      const isOpen = card.classList.toggle('open');
-      body.style.maxHeight = isOpen ? card.querySelector('.steps-list').scrollHeight + 'px' : '0px';
+      if(!editing){
+        const head = card.querySelector('.goal-head');
+        head.addEventListener('click', () => { const body = card.querySelector('.goal-body'); const isOpen = card.classList.toggle('open'); body.style.maxHeight = isOpen ? card.querySelector('.steps-list').scrollHeight + 'px' : '0px'; });
+        card.querySelectorAll('.step-status-select').forEach(select => select.addEventListener('change', event => { goal.steps[Number(event.target.dataset.stepIndex)].status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); renderGoals(); }));
+      } else {
+        card.querySelectorAll('[data-field]').forEach(field => field.addEventListener('input', event => { const index = Number(event.target.dataset.stepIndex); const target = Number.isNaN(index) ? goal : goal.steps[index]; target[event.target.dataset.field] = event.target.value; }));
+        card.querySelectorAll('.remove-step').forEach(button => button.addEventListener('click', () => { goal.steps.splice(Number(button.dataset.stepIndex), 1); renderGoals(); }));
+        card.querySelector('.add-step').addEventListener('click', () => { goal.steps.push({ name: 'New milestone', status: 'not-started', quarter: goal.quarter }); renderGoals(); });
+      }
+      goalsList.appendChild(card);
     });
+  }
 
-    card.querySelectorAll('.step-status-select').forEach(select => {
-      select.addEventListener('click', event => event.stopPropagation());
-      select.addEventListener('change', event => {
-        const step = goal.steps[Number(event.target.dataset.stepIndex)];
-        step.status = event.target.value;
-        saveProgress();
+  function setEditing(value){
+    editing = value;
+    editToggle.hidden = value;
+    editCancel.hidden = !value;
+    editSave.hidden = !value;
+    draftGoals = value ? cloneGoals(DASHBOARD.goals) : null;
+    renderGoals();
+  }
 
-        const stepRow = event.target.closest('.step');
-        stepRow.className = `step status-${step.status}`;
-        event.target.className = `step-status-select status-${step.status}`;
-        const pct = pctForGoal(goal);
-        card.querySelector('.progress-fill').style.width = pct + '%';
-        card.querySelector('.progress-pct').textContent = `${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones`;
-        if(card.classList.contains('open')) card.querySelector('.goal-body').style.maxHeight = card.querySelector('.steps-list').scrollHeight + 'px';
-      });
-    });
-
-    goalsList.appendChild(card);
+  editToggle.addEventListener('click', () => setEditing(true));
+  editCancel.addEventListener('click', () => setEditing(false));
+  editSave.addEventListener('click', () => {
+    DASHBOARD.goals = cloneGoals(draftGoals);
+    localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals));
+    setEditing(false);
+    location.reload();
   });
+
+  renderGoals();
 })();
 </script>
 
