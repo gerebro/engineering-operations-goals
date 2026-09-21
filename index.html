@@ -85,14 +85,40 @@ h1{
 }
 
 .summary-row{
-  display:flex;
-  gap: 28px;
+  display:grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 16px;
   margin-top: 28px;
-  flex-wrap: wrap;
+}
+
+.summary-group{
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 16px 18px 18px;
+}
+
+.summary-group-label{
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.summary-group-stats{
+  display:grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.summary-group.progress .summary-group-stats{
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .summary-stat{
-  min-width: 120px;
+  min-width: 0;
 }
 
 .summary-stat .num{
@@ -106,6 +132,7 @@ h1{
   font-size: 0.82rem;
   color: var(--ink-soft);
   margin-top: 4px;
+  line-height: 1.25;
 }
 
 .summary-stat.on-track .num{ color: var(--on-track); }
@@ -114,6 +141,9 @@ h1{
 .summary-stat.done .num{ color: var(--done); }
 .summary-stat.not-started .num{ color: var(--ink-soft); }
 .summary-stat.in-progress .num{ color: var(--on-track); }
+.summary-stat.sub-goals .num{ color: var(--ink-soft); }
+.summary-stat.sub-goals-in-progress .num{ color: var(--on-track); }
+.summary-stat.sub-goals-done .num{ color: var(--done); }
 
 .edit-toolbar{
   display:flex;
@@ -508,6 +538,10 @@ footer{
   .rail-quarter:nth-child(3){ border-left: none; }
   .goal-head{ flex-wrap: wrap; }
   .goal-head-right{ width: 100%; justify-content: space-between; }
+  .summary-row{ grid-template-columns: 1fr; }
+  .summary-group-stats{ gap: 10px; }
+  .summary-stat .num{ font-size: 1.65rem; }
+  .summary-stat .label{ font-size: 0.72rem; }
   .edit-toolbar{ align-items:flex-start; flex-direction:column; }
   .edit-toolbar-actions{ width:100%; }
   .edit-button{ flex:1; }
@@ -669,24 +703,49 @@ const DASHBOARD = {
     return Math.round((done / goal.steps.length) * 100);
   }
 
-  // ---- Summary counts ----
-  const counts = { 'on-track':0, 'at-risk':0, 'blocked':0, 'done':0, 'not-started':0 };
-  DASHBOARD.goals.forEach(g => counts[normalizedGoalStatus(g.status)]++);
-
   const summaryRow = document.getElementById('summary-row');
-  const summaryDefs = [
-    ['on-track', 'On track'],
-    ['at-risk', 'At risk'],
-    ['blocked', 'Blocked'],
-    ['done', 'Done'],
-    ['not-started', 'Not started']
-  ];
-  summaryDefs.forEach(([key, label]) => {
-    const el = document.createElement('div');
-    el.className = `summary-stat ${key}`;
-    el.innerHTML = `<div class="num">${counts[key]}</div><div class="label">${label}</div>`;
-    summaryRow.appendChild(el);
-  });
+  function renderSummary(){
+    const counts = { 'on-track':0, 'at-risk':0, 'blocked':0, 'done':0, 'not-started':0 };
+    let subGoalCount = 0;
+    let subGoalsInProgress = 0;
+    let subGoalsDone = 0;
+    DASHBOARD.goals.forEach(goal => {
+      counts[normalizedGoalStatus(goal.status)]++;
+      (goal.steps || []).forEach(step => {
+        subGoalCount++;
+        if(normalizedStatus(step.status) === 'in-progress') subGoalsInProgress++;
+        if(normalizedStatus(step.status) === 'done') subGoalsDone++;
+      });
+    });
+
+    const healthDefs = [
+      ['on-track', 'On track', counts['on-track']],
+      ['at-risk', 'At risk', counts['at-risk']],
+      ['blocked', 'Blocked', counts['blocked']],
+      ['done', 'Done', counts['done']],
+      ['not-started', 'Not started', counts['not-started']]
+    ];
+    const progressDefs = [
+      ['sub-goals', 'Sub-goals', subGoalCount],
+      ['sub-goals-in-progress', 'Sub-goals in progress', subGoalsInProgress],
+      ['sub-goals-done', 'Sub-goals done', subGoalsDone]
+    ];
+    summaryRow.innerHTML = '';
+    [['health', 'Goal health', healthDefs], ['progress', 'Sub-goal progress', progressDefs]].forEach(([groupClass, groupLabel, definitions]) => {
+      const group = document.createElement('div');
+      group.className = `summary-group ${groupClass}`;
+      group.innerHTML = `<div class="summary-group-label">${groupLabel}</div><div class="summary-group-stats"></div>`;
+      const stats = group.querySelector('.summary-group-stats');
+      definitions.forEach(([key, label, count]) => {
+        const el = document.createElement('div');
+        el.className = `summary-stat ${key}`;
+        el.innerHTML = `<div class="num">${count}</div><div class="label">${label}</div>`;
+        stats.appendChild(el);
+      });
+      summaryRow.appendChild(group);
+    });
+  }
+  renderSummary();
 
   // ---- Quarterly rail ----
   const railTrack = document.getElementById('rail-track');
@@ -807,7 +866,7 @@ const DASHBOARD = {
         const goalStatusSelect = card.querySelector('.goal-status-select');
         goalStatusSelect.addEventListener('click', event => event.stopPropagation());
         goalStatusSelect.addEventListener('change', event => { goal.status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); location.reload(); });
-        card.querySelectorAll('.step-status-select').forEach(select => select.addEventListener('change', event => { goal.steps[Number(event.target.dataset.stepIndex)].status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); renderGoals(); }));
+        card.querySelectorAll('.step-status-select').forEach(select => select.addEventListener('change', event => { goal.steps[Number(event.target.dataset.stepIndex)].status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); renderSummary(); renderGoals(); }));
       } else {
         card.querySelectorAll('[data-field]').forEach(field => field.addEventListener('input', event => { const index = Number(event.target.dataset.stepIndex); const target = Number.isNaN(index) ? goal : goal.steps[index]; target[event.target.dataset.field] = event.target.value; }));
         card.querySelectorAll('.remove-step').forEach(button => button.addEventListener('click', () => { goal.steps.splice(Number(button.dataset.stepIndex), 1); renderGoals(); }));
