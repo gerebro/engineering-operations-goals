@@ -795,6 +795,7 @@ const DASHBOARD = {
   }
 
   const GOALS_STORAGE_KEY = 'engineering-goals-data';
+  const UPDATED_STORAGE_KEY = 'engineering-goals-last-updated';
   try {
     const savedGoals = JSON.parse(localStorage.getItem(GOALS_STORAGE_KEY) || 'null');
     if(Array.isArray(savedGoals)) DASHBOARD.goals = savedGoals;
@@ -813,7 +814,15 @@ const DASHBOARD = {
 
   document.getElementById('page-title').textContent = DASHBOARD.title;
   document.getElementById('page-subtitle').textContent = DASHBOARD.subtitle;
-  document.getElementById('updated-line').textContent = DASHBOARD.updated;
+  const updatedLine = document.getElementById('updated-line');
+  const savedUpdated = localStorage.getItem(UPDATED_STORAGE_KEY);
+  updatedLine.textContent = savedUpdated ? `Updated ${savedUpdated}` : DASHBOARD.updated;
+
+  function markUpdated(){
+    const updated = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date());
+    localStorage.setItem(UPDATED_STORAGE_KEY, updated);
+    updatedLine.textContent = `Updated ${updated}`;
+  }
 
   function pctForGoal(goal){
     if(!goal.steps || goal.steps.length === 0) return goal.status === 'done' ? 100 : 0;
@@ -976,8 +985,8 @@ const DASHBOARD = {
         head.addEventListener('click', () => { const body = card.querySelector('.goal-body'); const isOpen = card.classList.toggle('open'); body.style.maxHeight = isOpen ? card.querySelector('.steps-list').scrollHeight + 'px' : '0px'; });
         const goalStatusSelect = card.querySelector('.goal-status-select');
         goalStatusSelect.addEventListener('click', event => event.stopPropagation());
-        goalStatusSelect.addEventListener('change', event => { goal.status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); location.reload(); });
-        card.querySelectorAll('.step-status-select').forEach(select => select.addEventListener('change', event => { goal.steps[Number(event.target.dataset.stepIndex)].status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); renderSummary(); renderGoals(); }));
+        goalStatusSelect.addEventListener('change', event => { goal.status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); markUpdated(); location.reload(); });
+        card.querySelectorAll('.step-status-select').forEach(select => select.addEventListener('change', event => { goal.steps[Number(event.target.dataset.stepIndex)].status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); markUpdated(); renderSummary(); renderGoals(); }));
       } else {
         card.querySelectorAll('[data-field]').forEach(field => field.addEventListener('input', event => { const index = Number(event.target.dataset.stepIndex); const target = Number.isNaN(index) ? goal : goal.steps[index]; target[event.target.dataset.field] = event.target.value; }));
         card.querySelectorAll('.remove-step').forEach(button => button.addEventListener('click', () => { goal.steps.splice(Number(button.dataset.stepIndex), 1); renderGoals(); }));
@@ -1031,6 +1040,7 @@ const DASHBOARD = {
     commentsList.querySelectorAll('[data-comment-action="delete"]').forEach(button => button.addEventListener('click', () => {
       comments = comments.filter(comment => String(comment.id) !== button.dataset.commentId);
       localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
+      markUpdated();
       renderComments();
     }));
   }
@@ -1042,6 +1052,7 @@ const DASHBOARD = {
     if(!text) return;
     comments.push({ id: Date.now(), goal: commentGoal.value, date: commentDate.value, text });
     localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
+    markUpdated();
     commentText.value = '';
     commentDate.value = new Date().toISOString().slice(0, 10);
     renderComments();
@@ -1052,6 +1063,7 @@ const DASHBOARD = {
   editSave.addEventListener('click', () => {
     DASHBOARD.goals = cloneGoals(draftGoals);
     localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals));
+    markUpdated();
     setEditing(false);
     location.reload();
   });
