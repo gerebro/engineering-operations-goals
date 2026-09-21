@@ -225,6 +225,73 @@ h1{
   margin: 4px 0 10px;
 }
 
+.comments-section{
+  margin-top: 44px;
+}
+
+.comments-heading{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.comments-heading h2{
+  font-family: 'Fraunces', serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.comments-heading span{
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.comment-form{
+  display:grid;
+  grid-template-columns: 1.1fr 0.55fr;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.comment-form textarea{ min-height: 76px; resize: vertical; grid-column: 1 / -1; }
+.comment-form .edit-button{ justify-self:start; }
+
+.comments-list{
+  display:grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.comment-entry{
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--on-track);
+  border-radius: 4px;
+  padding: 13px 16px;
+}
+
+.comment-meta{
+  display:flex;
+  justify-content:space-between;
+  gap: 12px;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  margin-bottom: 7px;
+}
+
+.comment-related{ font-weight: 600; color: var(--ink); }
+.comment-text{ white-space: pre-wrap; line-height: 1.5; font-size: 0.88rem; }
+.comment-actions{ display:flex; gap: 10px; margin-top: 9px; }
+.comment-actions button{ border: none; background: transparent; color: var(--ink-soft); cursor: pointer; font: inherit; font-size: 0.74rem; padding: 0; }
+.comment-actions button:last-child{ color: var(--blocked); }
+.comments-empty{ color: var(--ink-soft); font-size: 0.84rem; padding: 6px 0; }
+
 /* ---------- Quarterly rail ---------- */
 
 .rail-section{
@@ -569,6 +636,9 @@ footer{
   .edit-toolbar{ align-items:flex-start; flex-direction:column; }
   .edit-toolbar-actions{ width:100%; }
   .edit-button{ flex:1; }
+  .comment-form{ grid-template-columns: 1fr; }
+  .comment-form textarea{ grid-column: auto; }
+  .comments-heading{ align-items:flex-start; flex-direction:column; }
 }
 </style>
 </head>
@@ -601,6 +671,20 @@ footer{
       </div>
     </div>
     <div id="goals-list"></div>
+  </section>
+
+  <section class="comments-section">
+    <div class="comments-heading">
+      <h2>Comments and updates</h2>
+      <span>Capture context for your 1:1s</span>
+    </div>
+    <form class="comment-form" id="comment-form">
+      <select class="edit-select" id="comment-goal" aria-label="Goal this comment relates to"></select>
+      <input class="edit-field" id="comment-date" type="date" aria-label="Comment date">
+      <textarea class="edit-field" id="comment-text" placeholder="Write an update, decision, risk, or next step..." aria-label="Comment"></textarea>
+      <button class="edit-button" type="submit">Add comment</button>
+    </form>
+    <div class="comments-list" id="comments-list"></div>
   </section>
 
   <footer>Updates are saved in this browser. Use Edit goals to maintain the roadmap from the page.</footer>
@@ -912,6 +996,57 @@ const DASHBOARD = {
     renderGoals();
   }
 
+  const COMMENTS_STORAGE_KEY = 'engineering-goals-comments';
+  const commentForm = document.getElementById('comment-form');
+  const commentGoal = document.getElementById('comment-goal');
+  const commentDate = document.getElementById('comment-date');
+  const commentText = document.getElementById('comment-text');
+  const commentsList = document.getElementById('comments-list');
+  let comments = [];
+  try { comments = JSON.parse(localStorage.getItem(COMMENTS_STORAGE_KEY) || '[]'); } catch(error) { comments = []; }
+
+  function escapeHtml(value){
+    return String(value).replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
+  }
+
+  function renderCommentGoals(){
+    const selected = commentGoal.value;
+    commentGoal.innerHTML = DASHBOARD.goals.map(goal => `<option value="${escapeHtml(goal.name)}">${escapeHtml(goal.name)}</option>`).join('');
+    if(DASHBOARD.goals.some(goal => goal.name === selected)) commentGoal.value = selected;
+  }
+
+  function renderComments(){
+    renderCommentGoals();
+    if(!comments.length){
+      commentsList.innerHTML = '<div class="comments-empty">No comments yet. Add the first update above.</div>';
+      return;
+    }
+    commentsList.innerHTML = comments.slice().reverse().map(comment => `
+      <article class="comment-entry">
+        <div class="comment-meta"><span class="comment-related">${escapeHtml(comment.goal)}</span><span>${escapeHtml(comment.date)}</span></div>
+        <div class="comment-text">${escapeHtml(comment.text)}</div>
+        <div class="comment-actions"><button type="button" data-comment-action="delete" data-comment-id="${comment.id}">Delete</button></div>
+      </article>
+    `).join('');
+    commentsList.querySelectorAll('[data-comment-action="delete"]').forEach(button => button.addEventListener('click', () => {
+      comments = comments.filter(comment => String(comment.id) !== button.dataset.commentId);
+      localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
+      renderComments();
+    }));
+  }
+
+  commentDate.value = new Date().toISOString().slice(0, 10);
+  commentForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const text = commentText.value.trim();
+    if(!text) return;
+    comments.push({ id: Date.now(), goal: commentGoal.value, date: commentDate.value, text });
+    localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(comments));
+    commentText.value = '';
+    commentDate.value = new Date().toISOString().slice(0, 10);
+    renderComments();
+  });
+
   editToggle.addEventListener('click', () => setEditing(true));
   editCancel.addEventListener('click', () => setEditing(false));
   editSave.addEventListener('click', () => {
@@ -922,6 +1057,7 @@ const DASHBOARD = {
   });
 
   renderGoals();
+  renderComments();
 })();
 </script>
 
