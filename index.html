@@ -341,6 +341,9 @@ h1{
 }
 
 .rail-quarter:first-child{ border-left: none; }
+.rail-quarter{
+  background: linear-gradient(to bottom, var(--on-track-bg) 0 var(--quarter-progress, 0%), var(--panel) var(--quarter-progress, 0%) 100%);
+}
 
 .quarter-label{
   position: absolute;
@@ -358,6 +361,7 @@ h1{
   font-weight: 400;
   margin-top: 3px;
 }
+
 
 .rail-stop{
   display:flex;
@@ -881,39 +885,46 @@ const DASHBOARD = {
 
   // ---- Quarterly rail ----
   const railTrack = document.getElementById('rail-track');
-  QUARTERS.forEach(q => {
-    const col = document.createElement('div');
-    col.className = 'rail-quarter';
+  function renderQuarterly(){
+    railTrack.innerHTML = '<div class="rail-line"></div>';
+    QUARTERS.forEach(q => {
+      const col = document.createElement('div');
+      const quarterSubGoals = DASHBOARD.goals.flatMap(goal => (goal.steps || []).filter(step => step.quarter === q).map(step => ({ goal, step })));
+      const completedSubGoals = quarterSubGoals.filter(({ step }) => normalizedStatus(step.status) === 'done').length;
+      const quarterProgress = quarterSubGoals.length ? Math.round((completedSubGoals / quarterSubGoals.length) * 100) : 0;
+      col.className = 'rail-quarter';
+      col.style.setProperty('--quarter-progress', `${quarterProgress}%`);
 
-    const label = document.createElement('div');
-    label.className = 'quarter-label';
-    const quarterSubGoals = DASHBOARD.goals.flatMap(goal => (goal.steps || []).filter(step => step.quarter === q).map(step => ({ goal, step })));
-    label.innerHTML = `${q}<span class="quarter-count">${quarterSubGoals.length} ${quarterSubGoals.length === 1 ? 'sub-goal' : 'sub-goals'}</span>`;
-    col.appendChild(label);
+      const label = document.createElement('div');
+      label.className = 'quarter-label';
+      label.innerHTML = `${q}<span class="quarter-count">${completedSubGoals}/${quarterSubGoals.length} done</span>`;
+      col.appendChild(label);
 
-    const stopsWrap = document.createElement('div');
-    stopsWrap.className = 'rail-stops-wrap';
+      const stopsWrap = document.createElement('div');
+      stopsWrap.className = 'rail-stops-wrap';
 
-    quarterSubGoals.forEach(({ goal, step }) => {
-      const stop = document.createElement('div');
-      const stepStatus = normalizedStatus(step.status);
-      stop.className = `rail-stop status-${stepStatus}`;
-      stop.title = `${step.name} · ${goal.name} · ${STEP_STATUS_LABEL[stepStatus]}`;
-      stop.innerHTML = `<span class="dot"></span><span class="stop-info"><span class="name">${step.name}</span></span>`;
-      stop.addEventListener('click', () => {
-        const card = document.getElementById('goal-' + slug(goal.name));
-        if(card){
-          card.classList.add('open');
-          card.querySelector('.goal-body').style.maxHeight = card.querySelector('.steps-list').scrollHeight + 'px';
-          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+      quarterSubGoals.forEach(({ goal, step }) => {
+        const stop = document.createElement('div');
+        const stepStatus = normalizedStatus(step.status);
+        stop.className = `rail-stop status-${stepStatus}`;
+        stop.title = `${step.name} · ${goal.name} · ${STEP_STATUS_LABEL[stepStatus]}`;
+        stop.innerHTML = `<span class="dot"></span><span class="stop-info"><span class="name">${step.name}</span></span>`;
+        stop.addEventListener('click', () => {
+          const card = document.getElementById('goal-' + slug(goal.name));
+          if(card){
+            card.classList.add('open');
+            card.querySelector('.goal-body').style.maxHeight = card.querySelector('.steps-list').scrollHeight + 'px';
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        });
+        stopsWrap.appendChild(stop);
       });
-      stopsWrap.appendChild(stop);
-    });
 
-    col.appendChild(stopsWrap);
-    railTrack.appendChild(col);
-  });
+      col.appendChild(stopsWrap);
+      railTrack.appendChild(col);
+    });
+  }
+  renderQuarterly();
 
   function slug(str){
     return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -991,7 +1002,7 @@ const DASHBOARD = {
         const goalStatusSelect = card.querySelector('.goal-status-select');
         goalStatusSelect.addEventListener('click', event => event.stopPropagation());
         goalStatusSelect.addEventListener('change', event => { goal.status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); markUpdated(); location.reload(); });
-        card.querySelectorAll('.step-status-select').forEach(select => select.addEventListener('change', event => { goal.steps[Number(event.target.dataset.stepIndex)].status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); markUpdated(); renderSummary(); renderGoals(); }));
+        card.querySelectorAll('.step-status-select').forEach(select => select.addEventListener('change', event => { goal.steps[Number(event.target.dataset.stepIndex)].status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); markUpdated(); renderSummary(); renderQuarterly(); renderGoals(); }));
       } else {
         card.querySelectorAll('[data-field]').forEach(field => field.addEventListener('input', event => { const index = Number(event.target.dataset.stepIndex); const target = Number.isNaN(index) ? goal : goal.steps[index]; target[event.target.dataset.field] = event.target.value; }));
         card.querySelectorAll('.remove-step').forEach(button => button.addEventListener('click', () => { goal.steps.splice(Number(button.dataset.stepIndex), 1); renderGoals(); }));
