@@ -779,7 +779,7 @@ const DASHBOARD = {
             </div>
             <div class="goal-head-right"><div class="progress-pct">${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones</div></div>
           </div>
-          <div class="goal-body open"><div class="steps-list">
+          <div class="goal-body open" style="max-height: none;"><div class="steps-list">
             <div class="editor-section-label">Sub-goals / milestones</div>
             ${goal.steps.map((step, stepIndex) => `
               <div class="step edit-milestone">
