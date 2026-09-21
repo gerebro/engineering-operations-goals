@@ -702,7 +702,7 @@ const QUARTERS = ["Q3 2026", "Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"];
 const DASHBOARD = {
   title: "Engineering Operations - Goals Roadmap 2026–27",
   subtitle: "Helena Gerebro - 2026–27 goals, shared for our 1:1s.",
-  updated: "Updated Sep 16, 2026",
+  updated: "Updated Sep 21, 2026",
   goals: [
     {
       name: "Backlog Triage Ownership",
@@ -815,11 +815,16 @@ const DASHBOARD = {
   document.getElementById('page-title').textContent = DASHBOARD.title;
   document.getElementById('page-subtitle').textContent = DASHBOARD.subtitle;
   const updatedLine = document.getElementById('updated-line');
-  const savedUpdated = localStorage.getItem(UPDATED_STORAGE_KEY);
-  updatedLine.textContent = savedUpdated ? `Updated ${savedUpdated}` : DASHBOARD.updated;
+  function formatUpdatedDate(date = new Date()){
+    return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  }
+
+  const currentUpdated = formatUpdatedDate();
+  localStorage.setItem(UPDATED_STORAGE_KEY, currentUpdated);
+  updatedLine.textContent = `Updated ${currentUpdated}`;
 
   function markUpdated(){
-    const updated = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date());
+    const updated = formatUpdatedDate();
     localStorage.setItem(UPDATED_STORAGE_KEY, updated);
     updatedLine.textContent = `Updated ${updated}`;
   }
