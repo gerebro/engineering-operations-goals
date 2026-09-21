@@ -186,6 +186,15 @@ h1{
   margin-top: 10px;
 }
 
+.editor-section-label{
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 4px 0 10px;
+}
+
 /* ---------- Quarterly rail ---------- */
 
 .rail-section{
@@ -528,7 +537,7 @@ footer{
     <div class="edit-toolbar">
       <p class="goals-heading">Goals</p>
       <div class="edit-toolbar-actions">
-        <button class="edit-button" id="edit-toggle" type="button">Edit goals</button>
+        <button class="edit-button" id="edit-toggle" type="button">Edit goals &amp; sub-goals</button>
         <button class="edit-button secondary" id="edit-cancel" type="button" hidden>Cancel</button>
         <button class="edit-button" id="edit-save" type="button" hidden>Save changes</button>
       </div>
@@ -771,6 +780,7 @@ const DASHBOARD = {
             <div class="goal-head-right"><div class="progress-pct">${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones</div></div>
           </div>
           <div class="goal-body open"><div class="steps-list">
+            <div class="editor-section-label">Sub-goals / milestones</div>
             ${goal.steps.map((step, stepIndex) => `
               <div class="step edit-milestone">
                 <input class="edit-field step-name" data-step-index="${stepIndex}" data-field="name" value="${step.name.replace(/"/g, '&quot;')}" aria-label="Milestone name">
