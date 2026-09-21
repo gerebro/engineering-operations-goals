@@ -113,6 +113,7 @@ h1{
 .summary-stat.blocked .num{ color: var(--blocked); }
 .summary-stat.done .num{ color: var(--done); }
 .summary-stat.not-started .num{ color: var(--ink-soft); }
+.summary-stat.in-progress .num{ color: var(--on-track); }
 
 .edit-toolbar{
   display:flex;
@@ -156,6 +157,11 @@ h1{
 
 .edit-field.goal-name-input{ font-family: 'Fraunces', serif; font-size: 1.1rem; }
 .edit-select{ width:auto; padding: 4px 6px; }
+.goal-status-select{ font-weight: 500; }
+.goal-status-select.status-done{ color: var(--done); border-color: var(--done); }
+.goal-status-select.status-in-progress{ color: var(--on-track); border-color: var(--on-track); }
+.goal-status-select.status-at-risk{ color: var(--at-risk); border-color: var(--at-risk); }
+.goal-status-select.status-blocked{ color: var(--blocked); border-color: var(--blocked); }
 .edit-milestone{ align-items:flex-start; }
 .edit-milestone .step-name{ padding-top: 4px; }
 .remove-step{
@@ -265,6 +271,8 @@ h1{
 
 .rail-stop.status-on-track{ border-color: var(--on-track); }
 .rail-stop.status-on-track .dot{ background: var(--on-track); }
+.rail-stop.status-in-progress{ border-color: var(--on-track); }
+.rail-stop.status-in-progress .dot{ background: var(--on-track); }
 .rail-stop.status-at-risk{ border-color: var(--at-risk); }
 .rail-stop.status-at-risk .dot{ background: var(--at-risk); }
 .rail-stop.status-blocked{ border-color: var(--blocked); }
@@ -352,6 +360,8 @@ h1{
 .badge.status-blocked .dot{ background: var(--blocked); }
 .badge.status-done{ background: var(--done-bg); color: var(--done); }
 .badge.status-done .dot{ background: var(--done); }
+.badge.status-in-progress{ background: var(--on-track-bg); color: var(--on-track); }
+.badge.status-in-progress .dot{ background: var(--on-track); }
 
 .goal-head-right{
   display:flex;
@@ -611,6 +621,7 @@ const DASHBOARD = {
 (function(){
   const STATUS_LABEL = {
     "on-track": "On track",
+    "in-progress": "In progress",
     "at-risk": "At risk",
     "blocked": "Blocked",
     "done": "Done"
@@ -627,11 +638,17 @@ const DASHBOARD = {
     return status === 'in progress' ? 'in-progress' : status === 'not started' ? 'not-started' : status;
   }
 
+  function normalizedGoalStatus(status){
+    if(status === 'in progress' || status === 'in-progress') return 'on-track';
+    return status === 'not started' ? 'not-started' : status;
+  }
+
   const GOALS_STORAGE_KEY = 'engineering-goals-data';
   try {
     const savedGoals = JSON.parse(localStorage.getItem(GOALS_STORAGE_KEY) || 'null');
     if(Array.isArray(savedGoals)) DASHBOARD.goals = savedGoals;
   } catch(error) {}
+  DASHBOARD.goals.forEach(goal => { goal.status = normalizedGoalStatus(goal.status); });
 
   document.getElementById('page-title').textContent = DASHBOARD.title;
   document.getElementById('page-subtitle').textContent = DASHBOARD.subtitle;
@@ -645,7 +662,7 @@ const DASHBOARD = {
 
   // ---- Summary counts ----
   const counts = { 'on-track':0, 'at-risk':0, 'blocked':0, 'done':0, 'not-started':0 };
-  DASHBOARD.goals.forEach(g => counts[normalizedStatus(g.status)]++);
+  DASHBOARD.goals.forEach(g => counts[normalizedGoalStatus(g.status)]++);
 
   const summaryRow = document.getElementById('summary-row');
   const summaryDefs = [
@@ -678,7 +695,7 @@ const DASHBOARD = {
 
     DASHBOARD.goals.filter(g => g.quarter === q).forEach(g => {
       const stop = document.createElement('div');
-      stop.className = `rail-stop status-${normalizedStatus(g.status)}`;
+      stop.className = `rail-stop status-${normalizedGoalStatus(g.status)}`;
       stop.innerHTML = `<span class="dot"></span><span class="name">${g.name}</span>`;
       stop.addEventListener('click', () => {
         const card = document.getElementById('goal-' + slug(g.name));
@@ -736,7 +753,7 @@ const DASHBOARD = {
     const goals = editing ? draftGoals : DASHBOARD.goals;
     goals.forEach((goal, goalIndex) => {
       const pct = pctForGoal(goal);
-      const goalStatus = normalizedStatus(goal.status);
+      const goalStatus = normalizedGoalStatus(goal.status);
       const card = document.createElement('div');
       card.className = `goal-card status-${goalStatus}`;
       card.id = 'goal-' + slug(goal.name);
@@ -747,7 +764,7 @@ const DASHBOARD = {
             <div class="goal-head-left">
               <input class="edit-field goal-name-input" data-field="name" value="${goal.name.replace(/"/g, '&quot;')}" aria-label="Goal name">
               <div class="goal-meta">
-                <select class="edit-select" data-field="status" aria-label="Goal status">${optionMarkup(['on-track', 'at-risk', 'blocked', 'done', 'not-started'], goalStatus)}</select>
+                <select class="edit-select" data-field="status" aria-label="Goal status">${optionMarkup(['not-started', 'on-track', 'at-risk', 'blocked', 'done'], goalStatus)}</select>
                 <select class="edit-select" data-field="quarter" aria-label="Target quarter">${optionMarkup(QUARTERS, goal.quarter)}</select>
               </div>
             </div>
@@ -767,7 +784,7 @@ const DASHBOARD = {
         `;
       } else {
         card.innerHTML = `
-          <div class="goal-head"><div class="goal-head-left"><div class="goal-name">${goal.name}</div><div class="goal-meta"><span class="badge status-${goalStatus}"><span class="dot"></span>${STATUS_LABEL[goalStatus] || 'Not started'}</span><span>Target ${goal.quarter}</span></div></div>
+          <div class="goal-head"><div class="goal-head-left"><div class="goal-name">${goal.name}</div><div class="goal-meta"><select class="edit-select goal-status-select status-${goalStatus}" aria-label="Status for ${goal.name}">${optionMarkup(['not-started', 'on-track', 'at-risk', 'blocked', 'done'], goalStatus)}</select><span>Target ${goal.quarter}</span></div></div>
             <div class="goal-head-right"><div class="progress-mini"><div class="progress-track"><div class="progress-fill" style="width:${pct}%; background: var(--${goalStatus === 'not-started' ? 'hairline' : goalStatus});"></div></div><div class="progress-pct">${pct}% · ${goal.steps.filter(s => normalizedStatus(s.status) === 'done').length}/${goal.steps.length} milestones</div></div><div class="chevron"></div></div>
           </div>
           <div class="goal-body"><div class="steps-list">${goal.steps.map((step, index) => `<div class="step status-${normalizedStatus(step.status)}"><div class="step-check"></div><div class="step-name">${step.name}</div><select class="step-status-select status-${normalizedStatus(step.status)}" data-step-index="${index}" aria-label="Status for ${step.name}">${optionMarkup(['not-started', 'in-progress', 'blocked', 'done'], normalizedStatus(step.status))}</select><div class="step-quarter">${step.quarter}</div></div>`).join('')}</div></div>
@@ -777,6 +794,9 @@ const DASHBOARD = {
       if(!editing){
         const head = card.querySelector('.goal-head');
         head.addEventListener('click', () => { const body = card.querySelector('.goal-body'); const isOpen = card.classList.toggle('open'); body.style.maxHeight = isOpen ? card.querySelector('.steps-list').scrollHeight + 'px' : '0px'; });
+        const goalStatusSelect = card.querySelector('.goal-status-select');
+        goalStatusSelect.addEventListener('click', event => event.stopPropagation());
+        goalStatusSelect.addEventListener('change', event => { goal.status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); location.reload(); });
         card.querySelectorAll('.step-status-select').forEach(select => select.addEventListener('change', event => { goal.steps[Number(event.target.dataset.stepIndex)].status = event.target.value; localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DASHBOARD.goals)); renderGoals(); }));
       } else {
         card.querySelectorAll('[data-field]').forEach(field => field.addEventListener('input', event => { const index = Number(event.target.dataset.stepIndex); const target = Number.isNaN(index) ? goal : goal.steps[index]; target[event.target.dataset.field] = event.target.value; }));
