@@ -239,13 +239,20 @@ h1{
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--ink-soft);
-  margin: 0 0 24px;
+  margin: 0 0 18px;
+}
+
+.rail-title span{
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 400;
+  margin-left: 8px;
 }
 
 .rail-track{
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   column-gap: 0;
   padding-top: 6px;
 }
@@ -261,8 +268,8 @@ h1{
 
 .rail-quarter{
   position: relative;
-  padding-top: 40px;
-  text-align: center;
+  padding: 42px 10px 8px;
+  text-align: left;
   border-left: 1px solid var(--hairline);
 }
 
@@ -271,23 +278,30 @@ h1{
 .quarter-label{
   position: absolute;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.78rem;
+  left: 10px;
+  font-size: 0.82rem;
   color: var(--ink-soft);
   font-weight: 500;
 }
 
+.quarter-count{
+  display:block;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  font-weight: 400;
+  margin-top: 3px;
+}
+
 .rail-stop{
-  display:inline-flex;
-  align-items:center;
+  display:flex;
+  align-items:flex-start;
   gap: 6px;
   background: var(--panel);
   border: 1.5px solid var(--hairline);
-  border-radius: 20px;
-  padding: 5px 12px 5px 8px;
-  font-size: 0.76rem;
-  margin: 0 6px 8px;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  margin: 0 0 8px;
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.1s ease;
   max-width: calc(100% - 12px);
@@ -303,9 +317,19 @@ h1{
 }
 
 .rail-stop span.name{
+  display:block;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.rail-stop .stop-info{ min-width:0; }
+.rail-stop .stop-status{
+  display:none;
 }
 
 .rail-stop.status-on-track{ border-color: var(--on-track); }
@@ -535,7 +559,7 @@ footer{
   .wrap{ padding: 32px 18px 60px; }
   h1{ font-size: 1.9rem; }
   .rail-track{ grid-template-columns: repeat(2, 1fr); row-gap: 20px; }
-  .rail-quarter:nth-child(3){ border-left: none; }
+  .rail-quarter:nth-child(2), .rail-quarter:nth-child(4){ border-left: none; }
   .goal-head{ flex-wrap: wrap; }
   .goal-head-right{ width: 100%; justify-content: space-between; }
   .summary-row{ grid-template-columns: 1fr; }
@@ -561,7 +585,7 @@ footer{
   </header>
 
   <section class="rail-section">
-    <p class="rail-title" id="rail-title">Quarterly view</p>
+    <p class="rail-title" id="rail-title">Sub-goals by quarter <span>Click a sub-goal to open its parent goal</span></p>
     <div class="rail-track" id="rail-track">
       <div class="rail-line"></div>
     </div>
@@ -589,7 +613,7 @@ footer{
    quarter must match one of the labels in QUARTERS below.
    ============================================================ */
 
-const QUARTERS = ["Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"];
+const QUARTERS = ["Q3 2026", "Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"];
 
 const DASHBOARD = {
   title: "Engineering Operations - Goals Roadmap 2026–27",
@@ -693,6 +717,16 @@ const DASHBOARD = {
   } catch(error) {}
   DASHBOARD.goals.forEach(goal => { goal.status = normalizedGoalStatus(goal.status); });
 
+  const STORAGE_KEY = 'engineering-goals-progress';
+  let savedProgress = {};
+  try { savedProgress = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(error) { savedProgress = {}; }
+  DASHBOARD.goals.forEach(goal => {
+    const savedSteps = savedProgress[slug(goal.name)];
+    if(savedSteps) goal.steps.forEach((step, index) => {
+      if(savedSteps[index]) step.status = savedSteps[index];
+    });
+  });
+
   document.getElementById('page-title').textContent = DASHBOARD.title;
   document.getElementById('page-subtitle').textContent = DASHBOARD.subtitle;
   document.getElementById('updated-line').textContent = DASHBOARD.updated;
@@ -755,18 +789,21 @@ const DASHBOARD = {
 
     const label = document.createElement('div');
     label.className = 'quarter-label';
-    label.textContent = q;
+    const quarterSubGoals = DASHBOARD.goals.flatMap(goal => (goal.steps || []).filter(step => step.quarter === q).map(step => ({ goal, step })));
+    label.innerHTML = `${q}<span class="quarter-count">${quarterSubGoals.length} ${quarterSubGoals.length === 1 ? 'sub-goal' : 'sub-goals'}</span>`;
     col.appendChild(label);
 
     const stopsWrap = document.createElement('div');
     stopsWrap.className = 'rail-stops-wrap';
 
-    DASHBOARD.goals.filter(g => g.quarter === q).forEach(g => {
+    quarterSubGoals.forEach(({ goal, step }) => {
       const stop = document.createElement('div');
-      stop.className = `rail-stop status-${normalizedGoalStatus(g.status)}`;
-      stop.innerHTML = `<span class="dot"></span><span class="name">${g.name}</span>`;
+      const stepStatus = normalizedStatus(step.status);
+      stop.className = `rail-stop status-${stepStatus}`;
+      stop.title = `${step.name} · ${goal.name} · ${STEP_STATUS_LABEL[stepStatus]}`;
+      stop.innerHTML = `<span class="dot"></span><span class="stop-info"><span class="name">${step.name}</span></span>`;
       stop.addEventListener('click', () => {
-        const card = document.getElementById('goal-' + slug(g.name));
+        const card = document.getElementById('goal-' + slug(goal.name));
         if(card){
           card.classList.add('open');
           card.querySelector('.goal-body').style.maxHeight = card.querySelector('.steps-list').scrollHeight + 'px';
@@ -783,16 +820,6 @@ const DASHBOARD = {
   function slug(str){
     return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   }
-
-  const STORAGE_KEY = 'engineering-goals-progress';
-  let savedProgress = {};
-  try { savedProgress = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(error) { savedProgress = {}; }
-  DASHBOARD.goals.forEach(goal => {
-    const savedSteps = savedProgress[slug(goal.name)];
-    if(savedSteps) goal.steps.forEach((step, index) => {
-      if(savedSteps[index]) step.status = savedSteps[index];
-    });
-  });
 
   function saveProgress(){
     const progress = {};
